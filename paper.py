@@ -171,28 +171,20 @@ class ArxivPaper:
                 conclusion = match.group(0)
         llm = get_llm()
         prompt = """
-        You are an expert scientific summarizer. Given the title, abstract, introduction and the conclusion (if any) of a paper in latex format, generate a one-sentence TLDR summary in both __LANG__ and English. 
+        You are an expert scientific summarizer. Given the title, abstract, introduction and the conclusion (if any) of a paper in latex format, generate a one-sentence TLDR summary in __LANG__. 
         Strip LaTeX/refs/math; be factual; no made-up numbers. 
         Focus on problem, approach, key contribution, and main outcome. 
         If robots are used, clearly state their type/shape (e.g., quadruped robot, humanoid, drone). 
-        
+        If no results, say “proposes/outlines”.
         Length rule:
-        - Default: one sentence per language (concise).
-        - If the paper is complex, allow up to 3 sentences per language and explicitly include method and conclusion/takeaway.
-        - Hard cap: ≤ 60 words per language.
-        
-        Also output 3–5 keywords (comma-separated), capturing key methods, tasks, or robot types.
-        If no results, say “proposes/outlines”:
+        - Default: one sentence(concise).
+        - If the paper is complex, allow up to 3 sentences and explicitly include method and conclusion/takeaway.
+        - Hard cap: ≤ 60 words.
         
         \\title{__TITLE__}
         \\begin{abstract}__ABSTRACT__\\end{abstract}
         __INTRODUCTION__
         __CONCLUSION__
-        
-        Output format (each item MUST be on a new line): 
-        Keywords: ...
-        (__LANG__:) ...
-        (English: ) ...
         """
         prompt = prompt.replace('__LANG__', llm.lang)
         prompt = prompt.replace('__TITLE__', self.title)
