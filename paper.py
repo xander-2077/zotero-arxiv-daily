@@ -179,7 +179,7 @@ class ArxivPaper:
         Length rule:
         - Default: one sentence(concise).
         - If the paper is complex, allow up to 3 sentences and explicitly include method and conclusion/takeaway.
-        - Hard cap: ≤ 60 words.
+        - Hard cap: ≤ 100 words.
         
         \\title{__TITLE__}
         \\begin{abstract}__ABSTRACT__\\end{abstract}
