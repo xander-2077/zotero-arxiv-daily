@@ -11,7 +11,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          repository: ${{ vars.REPOSITORY }}
+          # repository: ${{ vars.REPOSITORY }}
           ref: ${{ vars.REF }}
 
       - name: Setup uv
