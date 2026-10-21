@@ -1,8 +1,15 @@
 name: Send emails daily
 on:
   workflow_dispatch:
+    inputs:
+      target_date:
+        description: "Optional arXiv announcement date to backfill (YYYY-MM-DD). Leave empty for the normal daily RSS run."
+        required: false
+        default: ""
+        type: string
   schedule:
-    - cron: '0 22 * * *'
+    # 22:05 UTC rather than 22:00 so GitHub re-registers this schedule.
+    - cron: '5 22 * * *'
 
 jobs:
   calculate-and-send:
@@ -27,8 +34,14 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
           CUSTOM_CONFIG: ${{ vars.CUSTOM_CONFIG }}
+          TARGET_DATE: ${{ github.event.inputs.target_date }}
         run: |
           printf "%b\n" "$CUSTOM_CONFIG" > config/custom.yaml
           echo "Use custom config: "
           cat config/custom.yaml
+          if [ -n "${TARGET_DATE}" ]; then
+            echo "Backfilling arXiv announcement date: ${TARGET_DATE}"
+          else
+            echo "No target_date set; using the live arXiv RSS."
+          fi
           uv run src/zotero_arxiv_daily/main.py

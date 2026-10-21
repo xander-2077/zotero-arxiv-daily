@@ -1,3 +1,4 @@
+import os
 import tarfile
 import re
 import glob
@@ -139,6 +140,48 @@ def glob_match(path:str, pattern:str) -> bool:
     re_pattern = glob.translate(pattern,recursive=True)
     return re.match(re_pattern, path) is not None
 
+_TARGET_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_UNSET_TARGET_DATES = {"", "none", "null"}
+
+
+def resolve_arxiv_target_date(config: DictConfig) -> str | None:
+    """Return an arXiv announcement date (YYYY-MM-DD), or None for the live RSS.
+
+    A non-empty ``TARGET_DATE`` environment variable wins, so a workflow
+    dispatch input overrides config. Empty, missing, ``null``, and ``none``
+    keep the current RSS path. The date is the listing day on
+    ``https://arxiv.org/catchup/<category>/<date>``, which is the same
+    calendar day the daily email subject uses — not the upload timestamp.
+    """
+    candidates: list[object] = [os.environ.get("TARGET_DATE", "")]
+    source = getattr(config, "source", None)
+    arxiv_cfg = getattr(source, "arxiv", None) if source is not None else None
+    if arxiv_cfg is not None and hasattr(arxiv_cfg, "get"):
+        candidates.append(arxiv_cfg.get("target_date", None))
+
+    for raw in candidates:
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if text.lower() in _UNSET_TARGET_DATES:
+            continue
+        if _TARGET_DATE_RE.fullmatch(text) is None:
+            raise ValueError(
+                "arXiv target_date must be YYYY-MM-DD "
+                "(workflow input target_date, TARGET_DATE, or source.arxiv.target_date), "
+                f"got {text!r}."
+            )
+        try:
+            datetime.datetime.strptime(text, "%Y-%m-%d")
+        except ValueError as exc:
+            raise ValueError(
+                "arXiv target_date must be a real calendar date in YYYY-MM-DD, "
+                f"got {text!r}."
+            ) from exc
+        return text
+    return None
+
+
 def send_email(config:DictConfig, html:str):
     sender = config.email.sender
     receiver = config.email.receiver
@@ -152,7 +195,11 @@ def send_email(config:DictConfig, html:str):
     msg = MIMEText(html, 'html', 'utf-8')
     msg['From'] = _format_addr('Github Action <%s>' % sender)
     msg['To'] = _format_addr('You <%s>' % receiver)
-    today = datetime.datetime.now().strftime('%Y/%m/%d')
+    target_date = resolve_arxiv_target_date(config)
+    if target_date:
+        today = datetime.datetime.strptime(target_date, "%Y-%m-%d").strftime("%Y/%m/%d")
+    else:
+        today = datetime.datetime.now().strftime('%Y/%m/%d')
     msg['Subject'] = Header(f'Daily arXiv {today}', 'utf-8').encode()
 
     try:
