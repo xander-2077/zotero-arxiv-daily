@@ -1,12 +1,21 @@
 """Tests for zotero_arxiv_daily.utils: glob_match, send_email, tex extraction."""
 
+import datetime
 import smtplib
 import tarfile
 import io
+from email import message_from_string, policy
 
 import pytest
 
-from zotero_arxiv_daily.utils import glob_match, send_email, extract_tex_code_from_tar, _bm25_pick
+import zotero_arxiv_daily.utils as utils_mod
+from zotero_arxiv_daily.utils import (
+    glob_match,
+    send_email,
+    extract_tex_code_from_tar,
+    _bm25_pick,
+    resolve_arxiv_target_date,
+)
 from tests.canned_responses import make_stub_smtp
 
 
@@ -152,6 +161,51 @@ def test_send_email_falls_back_to_ssl(config, monkeypatch):
     monkeypatch.setattr(smtplib, "SMTP_SSL", StubSMTP_SSL)
     send_email(config, "<html>ssl</html>")
     assert len(sent) == 1
+
+
+def _freeze_email_now(monkeypatch):
+    class FixedDateTime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 3, 2, 22, 0, 0)
+
+    monkeypatch.setattr(utils_mod.datetime, "datetime", FixedDateTime)
+
+
+def test_send_email_subject_uses_run_date_without_target_date(config, monkeypatch):
+    monkeypatch.delenv("TARGET_DATE", raising=False)
+    sent = []
+    monkeypatch.setattr(smtplib, "SMTP", make_stub_smtp(sent))
+    _freeze_email_now(monkeypatch)
+    send_email(config, "<html>hello</html>")
+    assert message_from_string(sent[0][2], policy=policy.default)["Subject"] == "Daily arXiv 2026/03/02"
+
+
+def test_send_email_subject_uses_backfill_date(config, monkeypatch):
+    monkeypatch.setenv("TARGET_DATE", "2026-10-15")
+    sent = []
+    monkeypatch.setattr(smtplib, "SMTP", make_stub_smtp(sent))
+    _freeze_email_now(monkeypatch)
+    send_email(config, "<html>hello</html>")
+    assert message_from_string(sent[0][2], policy=policy.default)["Subject"] == "Daily arXiv 2026/10/15"
+
+
+def test_resolve_arxiv_target_date_prefers_env_then_config(config, monkeypatch):
+    monkeypatch.delenv("TARGET_DATE", raising=False)
+    assert resolve_arxiv_target_date(config) is None
+    config.source.arxiv.target_date = "2026-10-15"
+    assert resolve_arxiv_target_date(config) == "2026-10-15"
+    monkeypatch.setenv("TARGET_DATE", "2026-10-16")
+    assert resolve_arxiv_target_date(config) == "2026-10-16"
+    monkeypatch.setenv("TARGET_DATE", "   ")
+    assert resolve_arxiv_target_date(config) == "2026-10-15"
+
+
+def test_resolve_arxiv_target_date_rejects_bad_values(config, monkeypatch):
+    monkeypatch.delenv("TARGET_DATE", raising=False)
+    config.source.arxiv.target_date = "15-10-2026"
+    with pytest.raises(ValueError, match="YYYY-MM-DD"):
+        resolve_arxiv_target_date(config)
 
 
 def test_send_email_falls_back_to_plain(config, monkeypatch):

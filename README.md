@@ -97,6 +97,7 @@ source:
   arxiv:
     category: ["cs.AI","cs.CV","cs.LG","cs.CL"]
     include_cross_list: false # Set to true to include arXiv cross-list papers in these categories.
+    # target_date: "2026-10-15" # Optional. Set only to backfill that announcement day; leave unset for the daily RSS.
 
 executor:
   debug: ${oc.env:DEBUG,null}
@@ -117,6 +118,7 @@ source:
   arxiv:
     category: null # The categories of target arxiv papers. Find the abbr of your research area from [here](https://arxiv.org/category_taxonomy). Example: ["cs.AI","cs.CV","cs.LG","cs.CL"]
     include_cross_list: false # Whether to include arXiv cross-list papers in subscribed categories. Example: true
+    target_date: null # Optional announcement date (YYYY-MM-DD) to backfill that day's arXiv listing instead of the live RSS. Leave null for the normal daily run. Example: "2026-10-15"
   biorxiv:
     category: null # The categories of target biorxiv papers. Find categories from [here](https://www.biorxiv.org/). Example: ["biochemistry","animal behavior and cognition"]
   medrxiv:
@@ -170,7 +172,15 @@ That's all! Now you can test the workflow by manually triggering it:
 
 Then check the log and the receiver email after it finishes.
 
-By default, the main workflow runs on 22:00 UTC everyday. You can change this time by editting the workflow config `.github/workflows/main.yml`.
+By default, the main workflow runs at 22:05 UTC every day. You can change this time by editing the workflow config `.github/workflows/main.yml`.
+
+To backfill one missed announcement day, run the workflow manually and set `target_date` to that listing date (`YYYY-MM-DD`, the date that would have appeared in the subject `Daily arXiv YYYY/MM/DD`). Leave it empty for the normal daily RSS run. Weekend and holiday dates often have no papers. arXiv only serves this historical listing for about the last 90 days.
+
+```bash
+gh workflow run main.yml -f target_date=2026-10-15
+```
+
+You can also set the `TARGET_DATE` environment variable, or `source.arxiv.target_date` in config. An empty value keeps the live RSS path. Do not leave a date in `CUSTOM_CONFIG` if scheduled runs should keep using the RSS.
 
 ### Local Running
 Supported by [uv](https://github.com/astral-sh/uv), this workflow can easily run on your local device if uv is installed:
